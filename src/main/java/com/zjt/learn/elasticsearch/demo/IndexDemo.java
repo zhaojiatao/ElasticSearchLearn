@@ -22,7 +22,7 @@ import java.io.IOException;
  * @Date 2021-05-19 08:53
  */
 
-public class Demo2 {
+public class IndexDemo {
     RestHighLevelClient client=EsClient.getClient();
     String index="person";
     String type="man";

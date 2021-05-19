@@ -29,7 +29,7 @@ import java.util.Map;
  * @Date 2021-05-19 09:26
  */
 
-public class Demo3 {
+public class DocDemo {
     ObjectMapper mapper=new ObjectMapper();
     RestHighLevelClient client=EsClient.getClient();
     String index="person";
