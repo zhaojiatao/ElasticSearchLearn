@@ -1,15 +1,18 @@
 package com.zjt.learn.elasticsearch.demo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.get.GetRequest;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.search.*;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.index.query.Operator;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.*;
+import org.elasticsearch.index.reindex.BulkByScrollResponse;
+import org.elasticsearch.index.reindex.DeleteByQueryRequest;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -180,12 +183,356 @@ public class QueryDemo {
         }
     }
 
+    /**
+     * 根据id查询
+     * @throws IOException
+     */
+    @Test
+    public void findById() throws IOException{
+        //1、创建GetRequest
+        GetRequest request=new GetRequest(index,type,"1");
+        //2、执行查询
+        GetResponse resp=client.get(request,RequestOptions.DEFAULT);
+        //3、输出结果
+        System.out.println(resp.getSourceAsMap());
+
+    }
+
+    /**
+     * 根据ids查询
+     * @throws IOException
+     */
+    @Test
+    public void findByIds() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.idsQuery().addIds("1","2","3"));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+    }
+
+
+    /**
+     * 根据前缀查询
+     * @throws IOException
+     */
+    @Test
+    public void findByPrefix() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.prefixQuery("corpName","盒马"));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+    }
+
+    /**
+     * Fuzzy模糊查询
+     * @throws IOException
+     */
+    @Test
+    public void findByFuzzy() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.fuzzyQuery("corpName","盒马").prefixLength(2));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+    }
+
+    /**
+     * wildCard查询
+     * @throws IOException
+     */
+    @Test
+    public void findByWildCard() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.wildcardQuery("corpName","中国*"));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+
+    }
+
+
+    /**
+     * 范围查询
+     * @throws IOException
+     */
+    @Test
+    public void findByRange() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.rangeQuery("fee").lte(10).gte(5));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+
+    }
 
 
 
 
+    /**
+     * 正则查询
+     * @throws IOException
+     */
+    @Test
+    public void findByRegexp() throws IOException{
+        //1、创建Request
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.regexpQuery("mobile","139[0-9]{8}"));
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、获取到_source的数据，并展示
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
 
 
+    }
+
+    /**
+     * scroll分页
+     * @throws IOException
+     */
+    @Test
+    public void scrollQuery() throws IOException{
+        //1、创建SearchRequest
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+        //2、指定scroll信息
+        request.scroll(TimeValue.timeValueMinutes(1L));
+        //3、指定查询条件
+        SearchSourceBuilder builder = new SearchSourceBuilder();
+        builder.size(4);
+        builder.sort("fee", SortOrder.DESC);
+        builder.query(QueryBuilders.matchAllQuery());
+
+        request.source(builder);
+        //4、获取返回结果scrollId，source
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        String scrollId=resp.getScrollId();
+        System.out.println("---------首页---------");
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+        while (true){
+            //5、循环-创建SearchScrollRequest
+            SearchScrollRequest scrollRequest=new SearchScrollRequest(scrollId);
+            //6、指定scrollId的生存时间
+            scrollRequest.scroll(TimeValue.timeValueMinutes(1L));
+            //7、执行查询获取返回结果
+            SearchResponse scrollResp=client.scroll(scrollRequest,RequestOptions.DEFAULT);
+            //8、判断是否查询到了数据，数据
+            SearchHit[] hits = scrollResp.getHits().getHits();
+            if(hits != null && hits.length>0){
+                System.out.println("------------下一页------------");
+                for(SearchHit hit:hits){
+                    System.out.println(hit.getSourceAsMap());
+                }
+            }else{
+                //9、判断没有查询到数据-退出循环
+                System.out.println("-------------结束---------------");
+                break;
+            }
+
+        }
+
+        //10、创建ClearScrollRequest
+        ClearScrollRequest clearScrollRequest=new ClearScrollRequest();
+        //11、指定ScrollId
+        clearScrollRequest.addScrollId(scrollId);
+        //12、删除ScrollId
+        ClearScrollResponse clearScrollResponse = client.clearScroll(clearScrollRequest, RequestOptions.DEFAULT);
+        //13、输出结果
+        System.out.println("删除scroll："+clearScrollResponse.isSucceeded());
+
+    }
+
+    /**
+     *
+     * @throws IOException
+     */
+    @Test
+    public void deleteByQuery() throws IOException{
+        //1、创建DeleteByQueryRequest
+        DeleteByQueryRequest request=new DeleteByQueryRequest(index);
+        request.types(type);
+        //2、指定检索的条件和SearchRequest指定Query的方式不一样
+        request.setQuery(QueryBuilders.rangeQuery("fee").lt(4));
+        //3、执行删除
+        BulkByScrollResponse resp=client.deleteByQuery(request,RequestOptions.DEFAULT);
+        //4、输出返回结果
+        System.out.println(resp.toString());
+    }
+
+    /**
+     * bool查询
+     * @throws IOException
+     */
+    @Test
+    public void BoolQuery() throws IOException{
+        //1、创建SearchRequest
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        BoolQueryBuilder boolQuery=QueryBuilders.boolQuery();
+        // #查询省份为武汉或者北京
+        boolQuery.should(QueryBuilders.termQuery("province","武汉"));
+        boolQuery.should(QueryBuilders.termQuery("province","北京"));
+        //#运营商不是联通
+        boolQuery.mustNot(QueryBuilders.termQuery("operatorId",2));
+        //#smsContent中包含中国或平安
+        boolQuery.must(QueryBuilders.matchQuery("smsContent","中国"));
+        boolQuery.must(QueryBuilders.matchQuery("smsContent","平安"));
+
+        builder.query(boolQuery);
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、输出结果
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+    }
+
+    /**
+     *
+     * @throws IOException
+     */
+    @Test
+    public void BoostingQuery() throws IOException{
+        //1、创建SearchRequest
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        BoostingQueryBuilder boostingQuery=QueryBuilders.boostingQuery(
+          QueryBuilders.matchQuery("smsContent","收货安装"),
+          QueryBuilders.matchQuery("smsContent","王五")
+        ).negativeBoost(0.5f);
+        builder.query(boostingQuery);
+        request.source(builder);
+
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、输出结果
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+
+    }
+
+    /**
+     *
+     * @throws IOException
+     */
+    @Test
+    public void filter() throws IOException {
+        //1、创建SearchRequest
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+        //2、指定查询条件
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        BoolQueryBuilder boolQuery=QueryBuilders.boolQuery();
+        boolQuery.filter(QueryBuilders.termQuery("corpName","盒马鲜生"));
+        boolQuery.filter(QueryBuilders.rangeQuery("fee").lte(5));
+
+        builder.query(boolQuery);
+        request.source(builder);
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、输出结果
+        for(SearchHit hit:resp.getHits().getHits()){
+            Map<String,Object> result=hit.getSourceAsMap();
+            System.out.println(result);
+        }
+
+    }
 
 
 
