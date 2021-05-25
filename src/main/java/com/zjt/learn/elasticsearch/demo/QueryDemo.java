@@ -12,6 +12,7 @@ import org.elasticsearch.index.reindex.BulkByScrollResponse;
 import org.elasticsearch.index.reindex.DeleteByQueryRequest;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.junit.Test;
 
@@ -534,7 +535,36 @@ public class QueryDemo {
 
     }
 
+    /**
+     * 高亮查询
+     * @throws IOException
+     */
+    @Test
+    public void highLightQuery() throws IOException {
+        //1、创建SearchRequest
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
 
+        //2、指定查询条件(高亮)
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        builder.query(QueryBuilders.matchQuery("smsContent","盒马"));
+
+        HighlightBuilder highlightBuilder=new HighlightBuilder();
+        highlightBuilder.field("smsContent",10)
+                .preTags("<font color='red'>")
+                .postTags("</font>");
+        builder.highlighter(highlightBuilder);
+
+        request.source(builder);
+        //3、执行查询
+        SearchResponse resp=client.search(request,RequestOptions.DEFAULT);
+
+        //4、输出结果
+        for(SearchHit hit:resp.getHits().getHits()){
+            System.out.println(hit.getHighlightFields().get("smsContent"));
+        }
+
+    }
 
 
 }
