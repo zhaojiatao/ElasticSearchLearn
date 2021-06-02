@@ -6,6 +6,7 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.*;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.reindex.BulkByScrollResponse;
@@ -24,6 +25,8 @@ import sun.reflect.generics.tree.VoidDescriptor;
 
 import javax.lang.model.element.VariableElement;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -647,6 +650,32 @@ public class QueryDemo {
         double min = agg.getMin();
         System.out.println("fee的最大值为："+max+",最小值为："+min);
     }
+
+    /**
+     * 基于Java实现坐标查询
+     * @throws IOException
+     */
+    @Test
+    public void geoPolygon() throws IOException{
+        SearchRequest request=new SearchRequest(index);
+        request.types(type);
+
+        SearchSourceBuilder builder=new SearchSourceBuilder();
+        List<GeoPoint> points=new ArrayList<>();
+        points.add(new GeoPoint(39.99878,116.298916));
+        points.add(new GeoPoint(39.972576,116.29561));
+        points.add(new GeoPoint(39.984739,116.327661));
+        builder.query(QueryBuilders.geoPolygonQuery("location",points));
+        request.source(builder);
+
+        SearchResponse resp = client.search(request, RequestOptions.DEFAULT);
+
+        for(SearchHit hit:resp.getHits().getHits()){
+            System.out.println(hit.getSourceAsMap());
+        }
+
+    }
+
 
 
 }
